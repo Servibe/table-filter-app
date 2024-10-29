@@ -1,15 +1,18 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+/* eslint-disable react/react-in-jsx-scope */
+import { useMemo, useState } from "react";
 import "./App.css";
 import { UsersList } from "./components/UsersList";
 import { SortBy, type User } from "./types.d";
+import { useUsers } from "./hooks/useUsers";
+import { Results } from "./components/Results";
 
 function App() {
-  const [users, setUsers] = useState<User[]>([]);
+  const { status, error, users, refetch, fetchNextPage, hasNextPage } =
+    useUsers();
+
   const [showColors, setShowColors] = useState(false);
   const [sorting, setSorting] = useState<SortBy>(SortBy.NONE);
   const [filterCountry, setFilterCountry] = useState<string | null>(null);
-
-  const originalUsers = useRef<User[]>([]);
 
   const toggleColors = () => {
     setShowColors(!showColors);
@@ -21,19 +24,6 @@ function App() {
 
     setSorting(newSortingValue);
   };
-
-  useEffect(() => {
-    fetch(`https://randomuser.me/api/?results=100`)
-      .then(async (res) => await res.json())
-      .then((response) => {
-        setUsers(response.results);
-
-        originalUsers.current = response.results;
-      })
-      .catch((error) => {
-        console.error(error.message);
-      });
-  }, []);
 
   const filteredUsers = useMemo(() => {
     // Hacemos el typeof para tener en cuenta que el valor que nos venga no sea nullable
@@ -66,13 +56,13 @@ function App() {
   }, [filteredUsers, sorting]);
 
   const handleDelete = (email: string) => {
-    const filteredUsers = users.filter((user) => user.email !== email);
-
-    setUsers(filteredUsers);
+    // const filteredUsers = users.filter((user) => user.email !== email);
+    // setUsers(filteredUsers);
   };
 
   const handleReset = () => {
-    setUsers(originalUsers.current);
+    // setUsers(originalUsers.current);
+    void refetch();
   };
 
   const handleChangeSort = (sort: SortBy) => {
@@ -82,6 +72,7 @@ function App() {
   return (
     <div className="App">
       <h1>Filtrar Tabla</h1>
+      <Results />
       <header>
         <button onClick={toggleColors}>Colorear filas</button>
         <button onClick={toggleSortByCountry}>
@@ -98,12 +89,24 @@ function App() {
         />
       </header>
       <main>
-        <UsersList
-          users={sortedUsers}
-          showColors={showColors}
-          deleteUser={handleDelete}
-          changeSorting={handleChangeSort}
-        />
+        {status === "pending" ? (
+          <strong>Cargando...</strong>
+        ) : status === "error" ? (
+          <p>Error al cargar los datos</p>
+        ) : (
+          <UsersList
+            users={sortedUsers}
+            showColors={showColors}
+            deleteUser={handleDelete}
+            changeSorting={handleChangeSort}
+          />
+        )}
+        {!hasNextPage && <p>No hay más usuarios</p>}
+        {hasNextPage && (
+          <button onClick={() => fetchNextPage()} disabled={!hasNextPage}>
+            Cargar mas resultados
+          </button>
+        )}
       </main>
     </div>
   );
